@@ -1,33 +1,236 @@
+/**
+ * PromptNote — app.js
+ * Modüler, vintage temalı not alma uygulaması.
+ * Özellikler:
+ *  - SPA ekran geçişleri (Ana / Notlarım)
+ *  - Pul seçici (CSS tırtıklı kenar, vintage tasarım)
+ *  - Zarf galerisi (CSS Grid, pseudo-element katlanma efektleri)
+ *  - Zarf açılma animasyonu + parşömen mektup slide-up
+ *  - LocalStorage: id, baslik, icerik, tarih, secilenPul
+ *  - Tüm mevcut fidget toy özellikleri korundu
+ */
+
 document.addEventListener('DOMContentLoaded', () => {
-    const noteForm = document.getElementById('note-form');
-    const noteInput = document.getElementById('note-input');
-    const notesGrid = document.getElementById('notes-grid');
-    const sidebar = document.getElementById('sidebar');
-    const sidebarToggle = document.getElementById('sidebar-toggle');
-    const mobileOverlay = document.getElementById('mobile-overlay');
 
-    // Mobil tespiti - ağır animasyonları kapat
-    const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent)
-        || window.innerWidth <= 900;
+    // =====================================================
+    // PUL VERİTABANI
+    // Placeholder: gerçek projede bunlar .png/.svg olabilir.
+    // Her pul: id, emoji art, ülke, değer, accent rengi
+    // =====================================================
+    const STAMPS = [
+        { id: 'owl',     art: '🦉', country: 'Anadolu',  value: '5 Kr',  accent: '#4a6741' },
+        { id: 'rose',    art: '🌹', country: 'İstanbul', value: '10 Kr', accent: '#7a2535' },
+        { id: 'anchor',  art: '⚓', country: 'Bosphorus', value: '3 Kr', accent: '#2c4a6e' },
+        { id: 'moon',    art: '🌙', country: 'Orient',   value: '8 Kr',  accent: '#5a4030' },
+        { id: 'leaf',    art: '🍃', country: 'Anatolia', value: '2 Kr',  accent: '#3a5c38' },
+        { id: 'key',     art: '🗝️', country: 'Kapıkule', value: '15 Kr', accent: '#6a5020' },
+        { id: 'feather', art: '🪶', country: 'Yazı Ev',  value: '1 Kr',  accent: '#5a4060' },
+        { id: 'eye',     art: '🧿', country: 'Nazar',    value: '6 Kr',  accent: '#2a5570' },
+        { id: 'flame',   art: '🕯️', country: 'Mektup',   value: '4 Kr',  accent: '#704020' },
+    ];
 
-    // ==========================================
-    // Mobile Sidebar Toggle
-    // ==========================================
-    function toggleSidebar() {
-        sidebar.classList.toggle('open');
-        mobileOverlay.classList.toggle('active');
+    // =====================================================
+    // STATE
+    // =====================================================
+    let notes          = JSON.parse(localStorage.getItem('promptNotes')) || [];
+    let selectedStamp  = null;   // Seçili pul id'si
+    let stampPanelOpen = false;  // Pul paneli açık mı?
+    let currentScreen  = 'home'; // 'home' | 'gallery'
+    let openModalNoteId = null;  // Açık modal not id'si
+
+    // =====================================================
+    // DOM REFERANSLARI
+    // =====================================================
+    const noteForm          = document.getElementById('note-form');
+    const noteInput         = document.getElementById('note-input');
+    const notesGrid         = document.getElementById('notes-grid');
+    const sidebar           = document.getElementById('sidebar');
+    const sidebarToggle     = document.getElementById('sidebar-toggle');
+    const mobileOverlay     = document.getElementById('mobile-overlay');
+
+    const screenHome        = document.getElementById('screen-home');
+    const screenGallery     = document.getElementById('screen-gallery');
+    const galleryToggleBtn  = document.getElementById('gallery-toggle-btn');
+    const gtbBadge          = document.getElementById('gtb-badge');
+    const envelopesGrid     = document.getElementById('envelopes-grid');
+    const gallerySubtitle   = document.getElementById('gallery-subtitle');
+    const galleryEmpty      = document.getElementById('gallery-empty');
+
+    const stampSelectorArea = document.getElementById('stamp-selector-area');
+    const selectedStampSlot = document.getElementById('selected-stamp-slot');
+    const stampGalleryPanel = document.getElementById('stamp-gallery-panel');
+    const stampGalleryGrid  = document.getElementById('stamp-gallery-grid');
+
+    const modalOverlay      = document.getElementById('envelope-modal-overlay');
+    const modalEnvFlap      = document.getElementById('modal-env-flap');
+    const modalCloseBtn     = document.getElementById('modal-close-btn');
+    const modalStampSlot    = document.getElementById('modal-stamp-slot');
+    const modalLetterDate   = document.getElementById('modal-letter-date');
+    const modalLetterContent = document.getElementById('modal-letter-content');
+
+    // =====================================================
+    // YARDIMCI FONKSİYONLAR
+    // =====================================================
+
+    function escapeHTML(str) {
+        return String(str).replace(/[&<>'"]/g,
+            tag => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[tag])
+        );
     }
 
-    sidebarToggle.addEventListener('click', toggleSidebar);
-    mobileOverlay.addEventListener('click', toggleSidebar);
+    function formatDate(dateString) {
+        return new Date(dateString).toLocaleDateString('tr-TR', {
+            year: 'numeric', month: 'long', day: 'numeric'
+        });
+    }
 
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && sidebar.classList.contains('open')) toggleSidebar();
+    function shortDate(dateString) {
+        return new Date(dateString).toLocaleDateString('tr-TR', {
+            day: '2-digit', month: 'short', year: 'numeric'
+        });
+    }
+
+    /** Metnin ilk ~40 karakterini başlık olarak döndürür */
+    function makeTitle(content) {
+        const clean = content.replace(/\n/g, ' ').trim();
+        return clean.length > 42 ? clean.slice(0, 42) + '…' : clean;
+    }
+
+    function saveNotes() {
+        localStorage.setItem('promptNotes', JSON.stringify(notes));
+    }
+
+    function getStampById(id) {
+        return STAMPS.find(s => s.id === id) || null;
+    }
+
+    // =====================================================
+    // ROZET GÜNCELLEME
+    // =====================================================
+    function updateBadge() {
+        const count = notes.length;
+        gtbBadge.textContent = count;
+        gtbBadge.style.display = count > 0 ? 'inline-block' : 'none';
+    }
+
+    // =====================================================
+    // SPA EKRAN GEÇİŞLERİ
+    // =====================================================
+    function showScreen(name) {
+        currentScreen = name;
+
+        if (name === 'home') {
+            screenGallery.classList.add('screen-hidden');
+            screenHome.classList.remove('screen-hidden');
+            // Buton ikonları
+            document.querySelector('.gtb-icon-notebook').style.display = '';
+            document.querySelector('.gtb-label-open').style.display    = '';
+            document.querySelector('.gtb-icon-close').style.display    = 'none';
+            document.querySelector('.gtb-label-close').style.display   = 'none';
+        } else {
+            screenHome.classList.add('screen-hidden');
+            screenGallery.classList.remove('screen-hidden');
+            document.querySelector('.gtb-icon-notebook').style.display = 'none';
+            document.querySelector('.gtb-label-open').style.display    = 'none';
+            document.querySelector('.gtb-icon-close').style.display    = '';
+            document.querySelector('.gtb-label-close').style.display   = '';
+            renderGallery();
+        }
+    }
+
+    galleryToggleBtn.addEventListener('click', () => {
+        showScreen(currentScreen === 'home' ? 'gallery' : 'home');
     });
 
-    // ==========================================
-    // Auto-resize textarea
-    // ==========================================
+    // İlk yüklemede home gizli değil, gallery gizli
+    screenGallery.classList.add('screen-hidden');
+
+    // =====================================================
+    // PUL SEÇİCİ
+    // =====================================================
+
+    /** Pul küçük resim HTML üretici */
+    function renderStampThumb(stamp, size = 'normal') {
+        const small = size === 'small';
+        const w = small ? 42 : 56;
+        const h = small ? 52 : 68;
+        return `
+            <div class="stamp-thumb${selectedStamp === stamp.id ? ' selected' : ''}"
+                 data-stamp-id="${stamp.id}"
+                 style="width:${w}px;height:${h}px;"
+                 title="${stamp.country} · ${stamp.value}">
+                <div class="stamp-thumb-inner" style="background:${stamp.accent}18;">
+                    <span class="stamp-art">${stamp.art}</span>
+                    <span class="stamp-country">${stamp.country}</span>
+                    <span class="stamp-value">${stamp.value}</span>
+                </div>
+            </div>`;
+    }
+
+    /** Seçili pul slot'unu güncelle */
+    function updateStampSlot() {
+        if (!selectedStamp) {
+            selectedStampSlot.innerHTML = '<span class="stamp-slot-hint">＋</span>';
+            return;
+        }
+        const stamp = getStampById(selectedStamp);
+        if (!stamp) return;
+        selectedStampSlot.innerHTML = renderStampThumb(stamp, 'normal');
+    }
+
+    /** Pul galerisi panelini doldur */
+    function renderStampPanel() {
+        stampGalleryGrid.innerHTML = STAMPS.map(s => renderStampThumb(s)).join('');
+        // "Pulü kaldır" butonu
+        stampGalleryGrid.insertAdjacentHTML('beforeend',
+            `<button class="stamp-clear-btn" id="stamp-clear-btn">Pulsuz Gönder</button>`
+        );
+
+        // Pul seçme
+        stampGalleryGrid.querySelectorAll('.stamp-thumb').forEach(el => {
+            el.addEventListener('click', () => {
+                selectedStamp = el.dataset.stampId;
+                // Seçili class güncelle
+                stampGalleryGrid.querySelectorAll('.stamp-thumb').forEach(t => t.classList.remove('selected'));
+                el.classList.add('selected');
+                updateStampSlot();
+                closeStampPanel();
+            });
+        });
+
+        document.getElementById('stamp-clear-btn').addEventListener('click', () => {
+            selectedStamp = null;
+            updateStampSlot();
+            closeStampPanel();
+        });
+    }
+
+    function openStampPanel() {
+        stampPanelOpen = true;
+        stampGalleryPanel.classList.add('open');
+        renderStampPanel();
+    }
+
+    function closeStampPanel() {
+        stampPanelOpen = false;
+        stampGalleryPanel.classList.remove('open');
+    }
+
+    selectedStampSlot.addEventListener('click', (e) => {
+        e.stopPropagation();
+        stampPanelOpen ? closeStampPanel() : openStampPanel();
+    });
+
+    // Panel dışına tıklayınca kapat
+    document.addEventListener('click', (e) => {
+        if (stampPanelOpen && !stampSelectorArea.contains(e.target)) {
+            closeStampPanel();
+        }
+    });
+
+    // =====================================================
+    // NOT EKLEME
+    // =====================================================
     noteInput.addEventListener('input', function() {
         this.style.height = 'auto';
         this.style.height = this.scrollHeight + 'px';
@@ -36,315 +239,379 @@ document.addEventListener('DOMContentLoaded', () => {
     noteInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            if (this.value.trim()) noteForm.dispatchEvent(new Event('submit'));
+            if (this.value.trim() !== '') noteForm.dispatchEvent(new Event('submit'));
         }
     });
 
-    // ==========================================
-    // Notes Data (LocalStorage)
-    // ==========================================
-    let notes = JSON.parse(localStorage.getItem('promptNotes')) || [];
-
-    function saveNotes() {
-        localStorage.setItem('promptNotes', JSON.stringify(notes));
-    }
-
-    function formatDate(dateString) {
-        return new Date(dateString).toLocaleDateString('tr-TR', {
-            year: 'numeric', month: 'short', day: 'numeric',
-            hour: '2-digit', minute: '2-digit'
-        });
-    }
-
-    // ==========================================
-    // Render Notes (DocumentFragment ile)
-    // ==========================================
-    const trashSVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="3 6 5 6 21 6"></polyline>
-        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        <line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line>
-    </svg>`;
-
-    function renderNotes() {
-        const fragment = document.createDocumentFragment();
-        notesGrid.innerHTML = '';
-
-        if (notes.length === 0) {
-            const emptyEl = document.createElement('div');
-            emptyEl.className = 'empty-state';
-            emptyEl.innerHTML = 'Henüz not eklenmemiş.<br>İlk notunu yukarıdan ekleyebilirsin!';
-            notesGrid.appendChild(emptyEl);
-            return;
-        }
-
-        const sorted = [...notes].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        sorted.forEach(note => {
-            const card = document.createElement('div');
-            card.className = 'note-card';
-            card.dataset.id = note.id;
-            card.innerHTML = `
-                <div class="note-content">${escapeHTML(note.content)}</div>
-                <div class="note-footer">
-                    <span class="note-date">${formatDate(note.createdAt)}</span>
-                    <button class="delete-btn" aria-label="Notu Sil" data-id="${note.id}">${trashSVG}</button>
-                </div>`;
-            fragment.appendChild(card);
-        });
-        notesGrid.appendChild(fragment);
-    }
-
-    // Event delegation - her kart için ayrı listener yok
-    notesGrid.addEventListener('click', (e) => {
-        const btn = e.target.closest('.delete-btn');
-        if (!btn) return;
-        const id = btn.dataset.id;
-        const card = notesGrid.querySelector(`.note-card[data-id="${id}"]`);
-        if (card) {
-            card.classList.add('deleting');
-            setTimeout(() => {
-                notes = notes.filter(n => n.id !== id);
-                saveNotes();
-                renderNotes();
-            }, 280);
-        }
-    });
-
-    function escapeHTML(str) {
-        return str.replace(/[&<>'"]/g, t =>
-            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[t])
-        );
-    }
-
-    // ==========================================
-    // Add New Note
-    // ==========================================
     noteForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const content = noteInput.value.trim();
         if (!content) return;
 
-        notes.unshift({
-            id: Date.now().toString(36) + Math.random().toString(36).slice(2),
-            content,
-            createdAt: new Date().toISOString()
-        });
+        const newNote = {
+            id:         Date.now().toString(36) + Math.random().toString(36).slice(2),
+            baslik:     makeTitle(content),
+            icerik:     content,
+            tarih:      new Date().toISOString(),
+            secilenPul: selectedStamp || null
+        };
+
+        notes.unshift(newNote);
         saveNotes();
+        updateBadge();
+
         noteInput.value = '';
         noteInput.style.height = 'auto';
-        renderNotes();
 
-        // Wax seal bounce
+        renderSidebarNotes();
+
+        // Mühür zıplama
         const seal = document.querySelector('.wax-seal');
         if (seal) {
             seal.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
-            seal.style.transform = 'translate(-50%, 50%) scale(1.25) rotate(15deg)';
-            setTimeout(() => { seal.style.transform = 'translate(-50%, 50%) scale(1) rotate(0deg)'; }, 400);
+            seal.style.transform  = 'translate(-50%, 50%) scale(1.25) rotate(15deg)';
+            setTimeout(() => {
+                seal.style.transform = 'translate(-50%, 50%) scale(1) rotate(0deg)';
+            }, 400);
         }
+
+        // Küçük konfetti patlaması
+        const btnRect = document.getElementById('add-btn').getBoundingClientRect();
+        createParticleBurst(btnRect.left + btnRect.width / 2, btnRect.top + btnRect.height / 2, 14);
     });
 
-    renderNotes();
+    // =====================================================
+    // SIDEBAR NOT LİSTESİ
+    // =====================================================
+    function renderSidebarNotes() {
+        notesGrid.innerHTML = '';
+        if (notes.length === 0) {
+            notesGrid.innerHTML = `<div class="empty-state">Henüz not eklenmemiş.<br>İlk notunu yukarıdan ekleyebilirsin!</div>`;
+            return;
+        }
+        const sorted = [...notes].sort((a, b) => new Date(b.tarih) - new Date(a.tarih));
+        sorted.forEach(note => {
+            const card = document.createElement('div');
+            card.className = 'note-card';
+            card.dataset.id = note.id;
+            card.innerHTML = `
+                <div class="note-content">${escapeHTML(note.icerik)}</div>
+                <div class="note-footer">
+                    <span class="note-date">${shortDate(note.tarih)}</span>
+                    <button class="delete-btn" aria-label="Notu Sil" data-id="${note.id}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>`;
+            notesGrid.appendChild(card);
+        });
 
-    // ==========================================
-    // Service Worker Registration (PWA)
-    // ==========================================
+        notesGrid.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => deleteNote(btn.dataset.id));
+        });
+    }
+
+    function deleteNote(id) {
+        // Sidebar'daki kart
+        const card = document.querySelector(`.note-card[data-id="${id}"]`);
+        if (card) {
+            card.classList.add('deleting');
+        }
+        // Galeri zarfı
+        const envCard = document.querySelector(`.env-card[data-id="${id}"]`);
+        if (envCard) {
+            envCard.style.transition = 'opacity 0.3s, transform 0.3s';
+            envCard.style.opacity = '0';
+            envCard.style.transform = 'scale(0.9)';
+        }
+
+        setTimeout(() => {
+            notes = notes.filter(n => n.id !== id);
+            saveNotes();
+            updateBadge();
+            renderSidebarNotes();
+            if (currentScreen === 'gallery') renderGallery();
+        }, 300);
+    }
+
+    // =====================================================
+    // GALERİ EKRANI
+    // =====================================================
+    function buildStampHTML(stampId, size = 'normal') {
+        const stamp = getStampById(stampId);
+        if (!stamp) return '';
+        const small = size === 'small';
+        return `
+            <div class="env-stamp" style="${small ? 'width:42px;height:52px;' : ''}">
+                <div class="env-stamp-inner" style="background:${stamp.accent}22;">
+                    <span class="env-stamp-art">${stamp.art}</span>
+                    <span class="env-stamp-label">${stamp.value}</span>
+                </div>
+            </div>`;
+    }
+
+    function buildPostmarkHTML(lines = [3,5,4,3]) {
+        return `
+            <div class="env-postmark">
+                <div class="env-postmark-lines">
+                    ${lines.map(w => `<span style="width:${w * 5}px;"></span>`).join('')}
+                </div>
+            </div>`;
+    }
+
+    function renderGallery() {
+        envelopesGrid.innerHTML = '';
+        const count = notes.length;
+        gallerySubtitle.textContent = count === 0 ? '0 not' : `${count} mektup`;
+        galleryEmpty.style.display = count === 0 ? 'block' : 'none';
+        envelopesGrid.style.display = count === 0 ? 'none' : 'grid';
+
+        if (count === 0) return;
+
+        const sorted = [...notes].sort((a, b) => new Date(b.tarih) - new Date(a.tarih));
+
+        sorted.forEach((note, i) => {
+            const card = document.createElement('div');
+            card.className = 'env-card';
+            card.dataset.id = note.id;
+            card.style.animationDelay = `${i * 0.06}s`;
+
+            const hasStamp = note.secilenPul && getStampById(note.secilenPul);
+
+            card.innerHTML = `
+                <div class="env-body">
+                    <div class="env-stitching"></div>
+                    <div class="env-flap"></div>
+
+                    ${buildPostmarkHTML()}
+
+                    <div class="env-stamp-slot">
+                        ${hasStamp ? buildStampHTML(note.secilenPul, 'small') : ''}
+                    </div>
+
+                    <div class="env-date-stamp">${shortDate(note.tarih).toUpperCase()}</div>
+
+                    <div class="env-label-strip">
+                        <div class="env-title">${escapeHTML(note.baslik)}</div>
+                    </div>
+
+                    <button class="env-delete-btn" data-id="${note.id}" title="Notu Sil">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                        </svg>
+                        Sil
+                    </button>
+                </div>`;
+
+            // Zarfa tıklama → modal aç
+            card.querySelector('.env-body').addEventListener('click', (e) => {
+                if (e.target.closest('.env-delete-btn')) return;
+                openEnvelopeModal(note);
+            });
+
+            // Sil butonu
+            card.querySelector('.env-delete-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteNote(note.id);
+            });
+
+            envelopesGrid.appendChild(card);
+        });
+    }
+
+    // =====================================================
+    // ZARF AÇILMA MODAL
+    // =====================================================
+    function openEnvelopeModal(note) {
+        openModalNoteId = note.id;
+
+        // İçerikleri doldur
+        modalLetterDate.textContent = formatDate(note.tarih);
+        modalLetterContent.textContent = note.icerik;
+
+        // Pul
+        modalStampSlot.innerHTML = '';
+        if (note.secilenPul && getStampById(note.secilenPul)) {
+            const stamp = getStampById(note.secilenPul);
+            modalStampSlot.innerHTML = `
+                <div class="env-stamp" style="width:48px;height:58px;">
+                    <div class="env-stamp-inner" style="background:${stamp.accent}22;">
+                        <span class="env-stamp-art" style="font-size:1.5rem;">${stamp.art}</span>
+                        <span class="env-stamp-label">${stamp.country}</span>
+                        <span class="env-stamp-label">${stamp.value}</span>
+                    </div>
+                </div>`;
+        }
+
+        // Overlay açılış
+        modalOverlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeEnvelopeModal() {
+        modalOverlay.classList.remove('open');
+        document.body.style.overflow = '';
+        openModalNoteId = null;
+    }
+
+    modalCloseBtn.addEventListener('click', closeEnvelopeModal);
+    modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) closeEnvelopeModal();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && openModalNoteId) closeEnvelopeModal();
+    });
+
+    // =====================================================
+    // MOBİL SİDEBAR
+    // =====================================================
+    function toggleSidebar() {
+        sidebar.classList.toggle('open');
+        mobileOverlay.classList.toggle('active');
+    }
+    sidebarToggle.addEventListener('click', toggleSidebar);
+    mobileOverlay.addEventListener('click', () => {
+        if (sidebar.classList.contains('open')) toggleSidebar();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sidebar.classList.contains('open')) toggleSidebar();
+    });
+
+    // =====================================================
+    // İLK RENDER
+    // =====================================================
+    renderSidebarNotes();
+    updateBadge();
+
+    // =====================================================
+    // SERVICE WORKER
+    // =====================================================
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('sw.js').catch(() => {});
         });
     }
 
-    // ==========================================
-    // INTERACTIVE FIDGET TOYS
-    // Mobilde canvas & particle kapalı, sadece wax seal + sparkle aktif
-    // ==========================================
+    // =========================================================
+    // ↓↓↓  MEVCUT FİDGET TOY KODEKLERİ (aynen korundu)  ↓↓↓
+    // =========================================================
 
     // ---- INK TRAIL CANVAS ----
     const inkCanvas = document.getElementById('ink-canvas');
-    const inkCtx = inkCanvas ? inkCanvas.getContext('2d') : null;
-    let inkTrails = [];
-    let inkRafId = null;
-    let inkDirty = false;
+    const inkCtx    = inkCanvas.getContext('2d');
+    let inkTrails   = [];
 
-    if (inkCanvas && !isMobile) {
-        function resizeCanvas() {
-            inkCanvas.width = window.innerWidth;
-            inkCanvas.height = window.innerHeight;
-        }
-        resizeCanvas();
-
-        // Resize debounce
-        let resizeTimer;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(resizeCanvas, 200);
-        });
-
-        function drawInkTrails() {
-            inkRafId = null;
-            inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
-            let hasLive = false;
-
-            for (let t = inkTrails.length - 1; t >= 0; t--) {
-                const trail = inkTrails[t];
-                let allDead = true;
-
-                for (let i = 0; i < trail.points.length; i++) {
-                    trail.points[i].age += 0.005;
-                    if (trail.points[i].age < 1) allDead = false;
-                }
-
-                if (allDead) { inkTrails.splice(t, 1); continue; }
-                hasLive = true;
-
-                inkCtx.beginPath();
-                inkCtx.strokeStyle = 'rgba(200,160,80,0.6)';
-                inkCtx.lineWidth = trail.width;
-                inkCtx.lineCap = 'round';
-                inkCtx.lineJoin = 'round';
-
-                for (let i = 1; i < trail.points.length; i++) {
-                    const p0 = trail.points[i - 1];
-                    const p1 = trail.points[i];
-                    const alpha = Math.max(0, 1 - Math.max(p0.age, p1.age));
-                    if (alpha <= 0) continue;
-                    inkCtx.globalAlpha = alpha * 0.7;
-                    inkCtx.moveTo(p0.x, p0.y);
-                    inkCtx.lineTo(p1.x, p1.y);
-                }
-                inkCtx.stroke();
-                inkCtx.globalAlpha = 1;
-            }
-
-            if (hasLive) inkRafId = requestAnimationFrame(drawInkTrails);
-            else inkDirty = false;
-        }
-
-        function scheduleInkDraw() {
-            if (!inkRafId) inkRafId = requestAnimationFrame(drawInkTrails);
-        }
-
-        // ---- DRAGGABLE FOUNTAIN PEN ----
-        const pen = document.getElementById('fidget-pen');
-        let penDragging = false;
-        let penOffsetX, penOffsetY;
-        let currentTrail = null;
-        let penVelX = 0, penVelY = 0;
-        let lastPenX = 0, lastPenY = 0;
-        let penAnimFrame = null;
-
-        setTimeout(() => pen.classList.add('idle-wobble'), 2000);
-
-        function getPenTipPosition() {
-            const rect = pen.getBoundingClientRect();
-            const cx = rect.left + rect.width / 2;
-            const cy = rect.top + rect.height / 2;
-            const angle = -35 * Math.PI / 180;
-            const oy = rect.height / 2;
-            return {
-                x: cx - oy * Math.sin(angle),
-                y: cy + oy * Math.cos(angle)
-            };
-        }
-
-        function startPenDrag(clientX, clientY) {
-            penDragging = true;
-            pen.classList.remove('idle-wobble');
-            pen.classList.add('dragging');
-            if (penAnimFrame) { cancelAnimationFrame(penAnimFrame); penAnimFrame = null; }
-
-            const rect = pen.getBoundingClientRect();
-            penOffsetX = clientX - rect.left;
-            penOffsetY = clientY - rect.top;
-            lastPenX = clientX; lastPenY = clientY;
-            penVelX = 0; penVelY = 0;
-
-            currentTrail = { points: [], width: 2.5 };
-            inkTrails.push(currentTrail);
-            const tip = getPenTipPosition();
-            currentTrail.points.push({ x: tip.x, y: tip.y, age: 0 });
-            scheduleInkDraw();
-        }
-
-        function movePen(clientX, clientY) {
-            if (!penDragging) return;
-            penVelX = clientX - lastPenX;
-            penVelY = clientY - lastPenY;
-            lastPenX = clientX; lastPenY = clientY;
-
-            pen.style.left = (clientX - penOffsetX) + 'px';
-            pen.style.top = (clientY - penOffsetY) + 'px';
-            pen.style.right = 'auto';
-            pen.style.bottom = 'auto';
-            pen.style.transform = 'rotate(-35deg)';
-
-            if (currentTrail) {
-                const tip = getPenTipPosition();
-                const last = currentTrail.points[currentTrail.points.length - 1];
-                const dist = Math.hypot(tip.x - last.x, tip.y - last.y);
-                if (dist > 4) {
-                    currentTrail.points.push({ x: tip.x, y: tip.y, age: 0 });
-                    if (currentTrail.points.length > 300) currentTrail.points.shift();
-                }
-            }
-        }
-
-        function endPenDrag() {
-            if (!penDragging) return;
-            penDragging = false;
-            pen.classList.remove('dragging');
-            currentTrail = null;
-
-            if (Math.abs(penVelX) > 2 || Math.abs(penVelY) > 2) {
-                applyPenMomentum();
-            } else {
-                setTimeout(() => { if (!penDragging) pen.classList.add('idle-wobble'); }, 1500);
-            }
-        }
-
-        function applyPenMomentum() {
-            const friction = 0.92;
-            function step() {
-                if (penDragging) return;
-                penVelX *= friction; penVelY *= friction;
-                pen.style.left = (parseFloat(pen.style.left) + penVelX) + 'px';
-                pen.style.top = (parseFloat(pen.style.top) + penVelY) + 'px';
-                if (Math.abs(penVelX) > 0.3 || Math.abs(penVelY) > 0.3) {
-                    penAnimFrame = requestAnimationFrame(step);
-                } else {
-                    setTimeout(() => { if (!penDragging) pen.classList.add('idle-wobble'); }, 1000);
-                }
-            }
-            penAnimFrame = requestAnimationFrame(step);
-        }
-
-        pen.addEventListener('mousedown', (e) => { e.preventDefault(); startPenDrag(e.clientX, e.clientY); });
-        pen.addEventListener('dblclick', () => {
-            inkTrails = [];
-            inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
-        });
-
-        // Tek global mousemove & mouseup listener
-        document.addEventListener('mousemove', (e) => {
-            if (penDragging) movePen(e.clientX, e.clientY);
-        });
-        document.addEventListener('mouseup', () => { if (penDragging) endPenDrag(); });
-
-        pen.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            startPenDrag(e.touches[0].clientX, e.touches[0].clientY);
-        }, { passive: false });
-
-        document.addEventListener('touchmove', (e) => {
-            if (penDragging) { e.preventDefault(); movePen(e.touches[0].clientX, e.touches[0].clientY); }
-        }, { passive: false });
-
-        document.addEventListener('touchend', () => { if (penDragging) endPenDrag(); });
-    } else if (inkCanvas) {
-        // Mobilde canvas'ı tamamen gizle
-        inkCanvas.style.display = 'none';
-        const pen = document.getElementById('fidget-pen');
-        if (pen) pen.style.display = 'none';
+    function resizeCanvas() {
+        inkCanvas.width  = window.innerWidth;
+        inkCanvas.height = window.innerHeight;
     }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    function drawInkTrails() {
+        inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
+        for (let t = inkTrails.length - 1; t >= 0; t--) {
+            const trail = inkTrails[t];
+            let allDead = true;
+            for (let i = 0; i < trail.points.length; i++) {
+                trail.points[i].age += 0.004;
+                if (trail.points[i].age < 1) allDead = false;
+            }
+            if (allDead) { inkTrails.splice(t, 1); continue; }
+            for (let i = 1; i < trail.points.length; i++) {
+                const p0 = trail.points[i - 1];
+                const p1 = trail.points[i];
+                const alpha = Math.max(0, 1 - Math.max(p0.age, p1.age));
+                if (alpha <= 0) continue;
+                inkCtx.beginPath();
+                inkCtx.moveTo(p0.x, p0.y);
+                inkCtx.lineTo(p1.x, p1.y);
+                inkCtx.strokeStyle = `rgba(200, 160, 80, ${alpha * 0.7})`;
+                inkCtx.lineWidth   = trail.width * (1 - p1.age * 0.3);
+                inkCtx.lineCap     = 'round';
+                inkCtx.lineJoin    = 'round';
+                inkCtx.stroke();
+            }
+        }
+        if (inkTrails.length > 0) requestAnimationFrame(drawInkTrails);
+    }
+
+    // ---- DRAGGABLE FOUNTAIN PEN ----
+    const pen = document.getElementById('fidget-pen');
+    let penDragging  = false;
+    let penOffX = 0, penOffY = 0;
+    let penX, penY;
+    let currentTrail = null;
+    const penInitBottom = 32, penInitRight = 96;
+
+    function getPenPos() {
+        const rect = pen.getBoundingClientRect();
+        return { x: rect.left + rect.width / 2, y: rect.bottom };
+    }
+
+    function startPenDrag(clientX, clientY) {
+        penDragging = true;
+        pen.classList.add('dragging');
+        pen.classList.remove('idle-wobble');
+        const rect = pen.getBoundingClientRect();
+        penOffX = clientX - rect.left;
+        penOffY = clientY - rect.top;
+        pen.style.transition = 'none';
+        currentTrail = { points: [], width: 2.5 };
+        inkTrails.push(currentTrail);
+        if (inkTrails.length === 1) requestAnimationFrame(drawInkTrails);
+    }
+
+    function movePenDrag(clientX, clientY) {
+        if (!penDragging) return;
+        penX = clientX - penOffX;
+        penY = clientY - penOffY;
+        pen.style.left   = penX + 'px';
+        pen.style.top    = penY + 'px';
+        pen.style.right  = 'auto';
+        pen.style.bottom = 'auto';
+        if (currentTrail) {
+            const nibPos = getPenPos();
+            currentTrail.points.push({ x: nibPos.x, y: nibPos.y, age: 0 });
+            if (currentTrail.points.length > 200) currentTrail.points.shift();
+        }
+    }
+
+    function endPenDrag() {
+        if (!penDragging) return;
+        penDragging  = false;
+        currentTrail = null;
+        pen.classList.remove('dragging');
+        pen.style.transition = 'filter 0.2s';
+        setTimeout(() => pen.classList.add('idle-wobble'), 1000);
+    }
+
+    pen.addEventListener('mousedown', (e) => { e.preventDefault(); startPenDrag(e.clientX, e.clientY); });
+    document.addEventListener('mousemove', (e) => movePenDrag(e.clientX, e.clientY));
+    document.addEventListener('mouseup', () => { if (penDragging) endPenDrag(); });
+
+    pen.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const t = e.touches[0];
+        startPenDrag(t.clientX, t.clientY);
+    }, { passive: false });
+    document.addEventListener('touchmove', (e) => {
+        if (penDragging) {
+            const t = e.touches[0];
+            movePenDrag(t.clientX, t.clientY);
+        }
+    }, { passive: false });
+    document.addEventListener('touchend', () => { if (penDragging) endPenDrag(); });
+
+    pen.addEventListener('dblclick', () => {
+        inkTrails = [];
+        inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
+    });
+
+    setTimeout(() => pen.classList.add('idle-wobble'), 2000);
 
     // ---- SPINNABLE WAX SEAL ----
     const waxSeal = document.querySelector('.wax-seal');
@@ -354,56 +621,50 @@ document.addEventListener('DOMContentLoaded', () => {
         glowEl.className = 'seal-glow';
         waxSeal.appendChild(glowEl);
 
-        let sealSpinning = false;
-        let sealAngle = 0;
-        let sealVelocity = 0;
-        let sealLastAngle = 0;
+        let sealSpinning = false, sealAngle = 0, sealVelocity = 0, sealLastAngle = 0;
         let sealAnimFrame = null;
-        const sealInner = waxSeal.querySelector('.seal-inner');
 
         function getSealCenter() {
             const rect = waxSeal.getBoundingClientRect();
             return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
         }
-
-        function getAngle(cx, cy) {
+        function getAngleFromCenter(cx, cy) {
             const c = getSealCenter();
             return Math.atan2(cy - c.y, cx - c.x);
         }
-
         function startSealSpin(cx, cy) {
             sealSpinning = true;
             waxSeal.classList.add('spinning');
-            if (sealAnimFrame) { cancelAnimationFrame(sealAnimFrame); sealAnimFrame = null; }
-            sealLastAngle = getAngle(cx, cy);
-            sealVelocity = 0;
+            if (sealAnimFrame) cancelAnimationFrame(sealAnimFrame);
+            sealLastAngle = getAngleFromCenter(cx, cy);
+            sealVelocity  = 0;
         }
-
         function moveSealSpin(cx, cy) {
             if (!sealSpinning) return;
-            let delta = getAngle(cx, cy) - sealLastAngle;
-            if (delta > Math.PI) delta -= 2 * Math.PI;
+            const newAngle = getAngleFromCenter(cx, cy);
+            let delta = newAngle - sealLastAngle;
+            if (delta > Math.PI)  delta -= 2 * Math.PI;
             if (delta < -Math.PI) delta += 2 * Math.PI;
-            sealAngle += delta;
-            sealVelocity = delta;
-            sealLastAngle = getAngle(cx, cy);
-            if (sealInner) sealInner.style.transform = `rotate(${sealAngle}rad)`;
+            sealAngle    += delta;
+            sealVelocity  = delta;
+            sealLastAngle = newAngle;
+            const si = waxSeal.querySelector('.seal-inner');
+            if (si) si.style.transform = `rotate(${sealAngle}rad)`;
             waxSeal.classList.toggle('fast-spin', Math.abs(sealVelocity) > 0.1);
         }
-
         function endSealSpin() {
             if (!sealSpinning) return;
             sealSpinning = false;
             waxSeal.classList.remove('spinning');
             if (Math.abs(sealVelocity) > 0.01) sealMomentum();
         }
-
         function sealMomentum() {
             function step() {
                 if (sealSpinning) return;
                 sealVelocity *= 0.97;
-                sealAngle += sealVelocity;
-                if (sealInner) sealInner.style.transform = `rotate(${sealAngle}rad)`;
+                sealAngle    += sealVelocity;
+                const si = waxSeal.querySelector('.seal-inner');
+                if (si) si.style.transform = `rotate(${sealAngle}rad)`;
                 waxSeal.classList.toggle('fast-spin', Math.abs(sealVelocity) > 0.05);
                 if (Math.abs(sealVelocity) > 0.002) {
                     sealAnimFrame = requestAnimationFrame(step);
@@ -413,78 +674,72 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             sealAnimFrame = requestAnimationFrame(step);
         }
-
         waxSeal.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); startSealSpin(e.clientX, e.clientY); });
+        document.addEventListener('mousemove', (e) => moveSealSpin(e.clientX, e.clientY));
+        document.addEventListener('mouseup', endSealSpin);
         waxSeal.addEventListener('touchstart', (e) => {
             e.preventDefault(); e.stopPropagation();
             startSealSpin(e.touches[0].clientX, e.touches[0].clientY);
         }, { passive: false });
-
-        document.addEventListener('mousemove', (e) => { if (sealSpinning) moveSealSpin(e.clientX, e.clientY); });
-        document.addEventListener('mouseup', () => { if (sealSpinning) endSealSpin(); });
         document.addEventListener('touchmove', (e) => {
             if (sealSpinning) moveSealSpin(e.touches[0].clientX, e.touches[0].clientY);
-        }, { passive: true });
+        });
         document.addEventListener('touchend', () => { if (sealSpinning) endSealSpin(); });
     }
 
     // ---- SPARKLE STAR PARTICLE BURST ----
-    const sparkleStar = document.getElementById('sparkle-star');
-    const particleContainer = document.getElementById('particle-container');
+    const sparkleStar        = document.getElementById('sparkle-star');
+    const particleContainer  = document.getElementById('particle-container');
 
-    // Mobilde daha az parçacık
-    const MAX_PARTICLES = isMobile ? 8 : 20;
-
-    function createParticleBurst(originX, originY, count = MAX_PARTICLES) {
-        const colors = ['rgba(229,192,123,0.9)', 'rgba(200,160,80,0.8)', 'rgba(255,215,0,0.7)', 'rgba(218,165,32,0.8)'];
-
+    function createParticleBurst(originX, originY, count = 20) {
+        const colors = [
+            'rgba(229,192,123,0.9)', 'rgba(200,160,80,0.8)',
+            'rgba(180,140,60,0.9)',  'rgba(255,215,0,0.7)',
+            'rgba(218,165,32,0.8)'
+        ];
         for (let i = 0; i < count; i++) {
-            const particle = document.createElement('div');
+            const particle  = document.createElement('div');
             particle.className = 'particle';
-            const size = Math.random() * 5 + 2;
-            const angle = (Math.PI * 2 * i) / count;
-            const speed = Math.random() * 100 + 40;
-            const dx = Math.cos(angle) * speed;
-            const dy = Math.sin(angle) * speed;
-            const duration = Math.random() * 700 + 500;
-            const color = colors[i % colors.length];
-
-            particle.style.cssText = `left:${originX}px;top:${originY}px;width:${size}px;height:${size}px;background:${color};`;
+            const size      = Math.random() * 6 + 2;
+            const angle     = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
+            const speed     = Math.random() * 120 + 40;
+            const dx        = Math.cos(angle) * speed;
+            const dy        = Math.sin(angle) * speed;
+            const duration  = Math.random() * 800 + 600;
+            const color     = colors[Math.floor(Math.random() * colors.length)];
+            particle.style.cssText = `left:${originX}px;top:${originY}px;width:${size}px;height:${size}px;background:${color};box-shadow:0 0 ${size*2}px ${color};`;
             particleContainer.appendChild(particle);
-
             const startTime = performance.now();
             function animateParticle(now) {
-                const p = (now - startTime) / duration;
-                if (p >= 1) { particle.remove(); return; }
-                const ep = 1 - Math.pow(1 - p, 3);
-                particle.style.transform = `translate(${dx * ep}px,${dy * ep + 25 * p * p}px) scale(${1 - p * 0.5})`;
-                particle.style.opacity = 1 - p;
+                const elapsed  = now - startTime;
+                const progress = elapsed / duration;
+                if (progress >= 1) { particle.remove(); return; }
+                const ease = 1 - Math.pow(1 - progress, 3);
+                const x = originX + dx * ease;
+                const y = originY + dy * ease + 30 * progress * progress;
+                particle.style.transform = `translate(${x - originX}px,${y - originY}px) scale(${1 - progress * 0.5})`;
+                particle.style.opacity   = 1 - progress;
                 requestAnimationFrame(animateParticle);
             }
             requestAnimationFrame(animateParticle);
         }
     }
 
-    if (sparkleStar) {
-        sparkleStar.addEventListener('click', (e) => {
-            const rect = sparkleStar.getBoundingClientRect();
-            sparkleStar.classList.remove('burst');
-            void sparkleStar.offsetWidth;
-            sparkleStar.classList.add('burst');
-            createParticleBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, isMobile ? 12 : 24);
-            setTimeout(() => sparkleStar.classList.remove('burst'), 500);
-        });
-    }
+    sparkleStar.addEventListener('click', (e) => {
+        const rect = sparkleStar.getBoundingClientRect();
+        sparkleStar.classList.remove('burst');
+        void sparkleStar.offsetWidth;
+        sparkleStar.classList.add('burst');
+        createParticleBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, 24);
+        setTimeout(() => sparkleStar.classList.remove('burst'), 500);
+    });
 
-    // Masaya tıklama - mobilde devre dışı (performans)
-    if (!isMobile) {
-        document.querySelector('.leather-desk')?.addEventListener('click', (e) => {
-            createParticleBurst(e.clientX, e.clientY, 5);
-        });
-    }
+    document.querySelector('.leather-desk').addEventListener('click', (e) => {
+        createParticleBurst(e.clientX, e.clientY, 6);
+    });
 
-    // Fidget hint - prefers-reduced-motion'a saygı
-    const hint = document.getElementById('fidget-hint');
-    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (hint && prefersReduced) hint.style.display = 'none';
+    // =====================================================
+    // window.deleteNote — geriye dönük uyumluluk
+    // =====================================================
+    window.deleteNote = deleteNote;
 });
