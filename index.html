@@ -10,6 +10,263 @@
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
     
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Special+Elite&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Dark Stone/Marble Desk Background -->
+    <div class="leather-desk">
+        <svg class="noise-svg">
+            <filter id="noise">
+                <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="4" stitchTiles="stitch"/>
+            </filter>
+            <rect width="100%" height="100%" filter="url(#noise)" opacity="0.06"/>
+        </svg>
+        <div class="desk-vignette"></div>
+    </div>
+
+    <!-- App Header -->
+    <header class="app-brand" id="app-brand">
+        <span class="brand-text">PromptNote</span>
+    </header>
+
+    <!-- =====================================================
+         GALLERY TOGGLE BUTTON (sağ üst köşe)
+         ===================================================== -->
+    <button class="gallery-toggle-btn" id="gallery-toggle-btn" title="Notlarımı Gör / Ana Sayfaya Dön">
+        <span class="gtb-icon gtb-icon-notebook">
+            <!-- Notebook icon -->
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+        </span>
+        <span class="gtb-icon gtb-icon-close" style="display:none">
+            <!-- Close / back icon -->
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+            </svg>
+        </span>
+        <span class="gtb-label gtb-label-open">Notlarım</span>
+        <span class="gtb-label gtb-label-close" style="display:none">Geri Dön</span>
+        <span class="gtb-badge" id="gtb-badge">0</span>
+    </button>
+
+    <!-- =====================================================
+         SCREEN 1 — ANA GİRİŞ EKRANI
+         ===================================================== -->
+    <div class="screen screen-home" id="screen-home">
+        <div class="app-layout">
+            <!-- Sidebar Toggle for Mobile -->
+            <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Not Defterini Aç/Kapat">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+            </button>
+
+            <!-- Left Sidebar -->
+            <aside class="notebook-sidebar" id="sidebar">
+                <div class="notebook-spine">
+                    <div class="spine-texture"></div>
+                    <div class="spine-bands">
+                        <div class="band"></div>
+                        <div class="band"></div>
+                        <div class="band"></div>
+                        <div class="band"></div>
+                    </div>
+                </div>
+                <div class="notebook-pages-edge"></div>
+                <div class="notebook-paper">
+                    <div class="paper-texture"></div>
+                    <div class="paper-fold-shadow"></div>
+                    <div class="notes-container" id="notes-grid"></div>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <div class="desk-center">
+                    <h1 class="cursive-title">Düşüncelerinizi Buraya Bırakın...</h1>
+                    
+                    <!-- Leather Envelope / Pouch -->
+                    <form id="note-form" class="leather-pouch">
+                        <!-- Envelope Flap -->
+                        <div class="pouch-flap">
+                            <div class="flap-stitching"></div>
+                        </div>
+
+                        <!-- Stamp Selector (zarf üstünde pul galerisi) -->
+                        <div class="stamp-selector-area" id="stamp-selector-area">
+                            <!-- Seçili pul buraya mount edilir -->
+                            <div class="selected-stamp-slot" id="selected-stamp-slot" title="Pul seç">
+                                <span class="stamp-slot-hint">＋</span>
+                            </div>
+                            <!-- Pul Galerisi Paneli -->
+                            <div class="stamp-gallery-panel" id="stamp-gallery-panel">
+                                <div class="stamp-gallery-header">Pul Seç</div>
+                                <div class="stamp-gallery-grid" id="stamp-gallery-grid">
+                                    <!-- JS ile doldurulacak -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Pouch Body -->
+                        <div class="pouch-body">
+                            <div class="pouch-stitching"></div>
+                            <div class="pouch-inner">
+                                <textarea 
+                                    id="note-input" 
+                                    class="gold-input"
+                                    placeholder="Büyük fikirlerini buraya yaz (ya da sadece alınacaklar listesini)..." 
+                                    rows="1" 
+                                    autofocus
+                                    required></textarea>
+                                <button type="submit" id="add-btn" class="gold-btn" aria-label="Not Ekle">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Wax Seal -->
+                        <div class="wax-seal">
+                            <div class="seal-inner">
+                                <span class="seal-letter">P</span>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Decorative Elements -->
+                    <div class="deco-nib deco-nib-left">
+                        <div class="nib-body"></div>
+                        <div class="nib-tip"></div>
+                        <div class="nib-ring"></div>
+                    </div>
+                    <div class="deco-nib deco-nib-right">
+                        <div class="nib-body"></div>
+                        <div class="nib-tip"></div>
+                        <div class="nib-ring"></div>
+                    </div>
+                    <div class="deco-sketch">
+                        <div class="sketch-lines">
+                            <svg viewBox="0 0 120 90" fill="none" stroke="rgba(80,60,30,0.4)" stroke-width="0.7">
+                                <rect x="10" y="15" width="40" height="55" rx="2"/>
+                                <circle cx="80" cy="40" r="20"/>
+                                <line x1="60" y1="70" x2="110" y2="70"/>
+                                <line x1="15" y1="80" x2="55" y2="80"/>
+                                <line x1="70" y1="15" x2="95" y2="15"/>
+                                <path d="M30 35 L40 25 L50 35"/>
+                                <circle cx="30" cy="50" r="5"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </main>
+            
+            <div id="mobile-overlay" class="mobile-overlay"></div>
+        </div>
+    </div>
+
+    <!-- =====================================================
+         SCREEN 2 — NOTLARIM GALERİ EKRANI
+         ===================================================== -->
+    <div class="screen screen-gallery" id="screen-gallery">
+        <div class="gallery-header">
+            <h2 class="gallery-title">Mektuplarım</h2>
+            <p class="gallery-subtitle" id="gallery-subtitle">0 not</p>
+        </div>
+        <div class="gallery-empty" id="gallery-empty" style="display:none">
+            <div class="gallery-empty-icon">✉</div>
+            <p>Henüz hiç not yok.<br>İlk mektubunu yaz!</p>
+        </div>
+        <div class="envelopes-grid" id="envelopes-grid">
+            <!-- JS ile doldurulacak -->
+        </div>
+    </div>
+
+    <!-- =====================================================
+         ZARF AÇILMA MODAL (Not Detay)
+         ===================================================== -->
+    <div class="envelope-modal-overlay" id="envelope-modal-overlay">
+        <div class="envelope-modal" id="envelope-modal">
+            <!-- Zarfın gövdesi (arka yüz) -->
+            <div class="modal-envelope-back">
+                <div class="modal-env-back-fold modal-env-fold-left"></div>
+                <div class="modal-env-back-fold modal-env-fold-right"></div>
+                <div class="modal-env-back-fold modal-env-fold-bottom"></div>
+                <!-- Açılan kapak -->
+                <div class="modal-env-flap" id="modal-env-flap"></div>
+                <!-- Kapatma butonu -->
+                <button class="modal-close-btn" id="modal-close-btn" aria-label="Kapat">✕</button>
+                <!-- Pul alanı -->
+                <div class="modal-stamp-slot" id="modal-stamp-slot"></div>
+            </div>
+            <!-- Zarftan çıkan parşömen kağıdı -->
+            <div class="modal-letter" id="modal-letter">
+                <div class="modal-letter-paper">
+                    <div class="modal-letter-lines"></div>
+                    <div class="modal-letter-date" id="modal-letter-date"></div>
+                    <div class="modal-letter-content" id="modal-letter-content"></div>
+                    <div class="modal-letter-signature">— PromptNote</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ink Trail Canvas -->
+    <canvas id="ink-canvas" class="ink-canvas"></canvas>
+    <!-- Particle Container -->
+    <div id="particle-container" class="particle-container"></div>
+
+    <!-- Draggable Fountain Pen -->
+    <div class="fidget-pen" id="fidget-pen" title="Beni sürükle! Mürekkep bırakırım ✍️">
+        <div class="pen-cap">
+            <div class="pen-cap-band"></div>
+            <div class="pen-clip"></div>
+        </div>
+        <div class="pen-barrel">
+            <div class="pen-barrel-band"></div>
+        </div>
+        <div class="pen-grip"></div>
+        <div class="pen-nib-section">
+            <div class="pen-nib"></div>
+            <div class="pen-nib-tip"></div>
+        </div>
+    </div>
+
+    <!-- Sparkle Star -->
+    <div class="sparkle-star" id="sparkle-star" title="Tıkla! ✨">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L13.5 9.5L21 8L14.5 12L18 19L12 14.5L6 19L9.5 12L3 8L10.5 9.5L12 2Z" 
+                  fill="none" stroke="rgba(229,192,123,0.5)" stroke-width="1" stroke-linejoin="round"/>
+        </svg>
+    </div>
+
+    <!-- Fidget hint -->
+    <div class="fidget-hint" id="fidget-hint">
+        <span>🖊️ Kalemi sürükle, mühürü çevir, yıldıza tıkla!</span>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html><!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PromptNote - Vintage</title>
+    <meta name="description" content="Vintage tasarımlı, zarif not alma uygulaması.">
+    <meta name="theme-color" content="#1a1a1c">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="apple-touch-icon" href="icon.svg">
+    
     <!-- Sadece gerekli fontlar, display=swap ile -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
