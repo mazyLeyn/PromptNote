@@ -10,7 +10,7 @@
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
     
-    <!-- Google Fonts: Great Vibes (Cursive) & Playfair Display (Serif) -->
+    <!-- Sadece gerekli fontlar, display=swap ile -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
@@ -18,32 +18,26 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Dark Stone/Marble Desk Background -->
+    <!-- Dark Background -->
     <div class="leather-desk">
-        <svg class="noise-svg">
-            <filter id="noise">
-                <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="4" stitchTiles="stitch"/>
-            </filter>
-            <rect width="100%" height="100%" filter="url(#noise)" opacity="0.06"/>
-        </svg>
         <div class="desk-vignette"></div>
     </div>
 
-    <!-- App Header (PromptNote branding) -->
+    <!-- App Header -->
     <header class="app-brand" id="app-brand">
         <span class="brand-text">PromptNote</span>
     </header>
 
     <div class="app-layout">
-        <!-- Sidebar Toggle for Mobile -->
+        <!-- Sidebar Toggle (Mobil) -->
         <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Not Defterini Aç/Kapat">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
             </svg>
         </button>
 
-        <!-- Left Sidebar (Vintage Leather Notebook) -->
+        <!-- Sol Sidebar -->
         <aside class="notebook-sidebar" id="sidebar">
             <div class="notebook-spine">
                 <div class="spine-texture"></div>
@@ -58,45 +52,38 @@
             <div class="notebook-paper">
                 <div class="paper-texture"></div>
                 <div class="paper-fold-shadow"></div>
-                <div class="notes-container" id="notes-grid">
-                    <!-- Notes injected here by app.js -->
-                </div>
+                <div class="notes-container" id="notes-grid"></div>
             </div>
         </aside>
 
-        <!-- Main Content Area (Desk Center) -->
+        <!-- Ana İçerik -->
         <main class="main-content">
             <div class="desk-center">
                 <h1 class="cursive-title">Düşüncelerinizi Buraya Bırakın...</h1>
                 
-                <!-- Leather Envelope / Pouch -->
-                <form id="note-form" class="leather-pouch">
-                    <!-- Envelope Flap -->
+                <form id="note-form" class="leather-pouch" novalidate>
                     <div class="pouch-flap">
                         <div class="flap-stitching"></div>
                     </div>
-                    
-                    <!-- Input Area -->
                     <div class="pouch-body">
                         <div class="pouch-stitching"></div>
                         <div class="pouch-inner">
                             <textarea 
                                 id="note-input" 
                                 class="gold-input"
-                                placeholder="Büyük fikirlerini buraya yaz (ya da sadece alınacaklar listesini)..." 
+                                placeholder="Büyük fikirlerini buraya yaz..." 
                                 rows="1" 
                                 autofocus
-                                required></textarea>
+                                autocomplete="off"
+                                spellcheck="false"></textarea>
                             <button type="submit" id="add-btn" class="gold-btn" aria-label="Not Ekle">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                     <line x1="22" y1="2" x2="11" y2="13"></line>
                                     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                                 </svg>
                             </button>
                         </div>
                     </div>
-
-                    <!-- Wax Seal -->
                     <div class="wax-seal">
                         <div class="seal-inner">
                             <span class="seal-letter">P</span>
@@ -104,18 +91,18 @@
                     </div>
                 </form>
 
-                <!-- Decorative Elements -->
-                <div class="deco-nib deco-nib-left">
+                <!-- Masaüstü dekorasyon -->
+                <div class="deco-nib deco-nib-left" aria-hidden="true">
                     <div class="nib-body"></div>
                     <div class="nib-tip"></div>
                     <div class="nib-ring"></div>
                 </div>
-                <div class="deco-nib deco-nib-right">
+                <div class="deco-nib deco-nib-right" aria-hidden="true">
                     <div class="nib-body"></div>
                     <div class="nib-tip"></div>
                     <div class="nib-ring"></div>
                 </div>
-                <div class="deco-sketch">
+                <div class="deco-sketch" aria-hidden="true">
                     <div class="sketch-lines">
                         <svg viewBox="0 0 120 90" fill="none" stroke="rgba(80,60,30,0.4)" stroke-width="0.7">
                             <rect x="10" y="15" width="40" height="55" rx="2"/>
@@ -131,18 +118,17 @@
             </div>
         </main>
         
-        <!-- Mobile Overlay -->
         <div id="mobile-overlay" class="mobile-overlay"></div>
     </div>
 
-    <!-- Ink Trail Canvas (full screen, behind interactive elements) -->
-    <canvas id="ink-canvas" class="ink-canvas"></canvas>
+    <!-- Ink Canvas (masaüstü) -->
+    <canvas id="ink-canvas" class="ink-canvas" aria-hidden="true"></canvas>
 
-    <!-- Particle Container -->
-    <div id="particle-container" class="particle-container"></div>
+    <!-- Parçacık Konteyneri -->
+    <div id="particle-container" class="particle-container" aria-hidden="true"></div>
 
-    <!-- Draggable Fountain Pen -->
-    <div class="fidget-pen" id="fidget-pen" title="Beni sürükle! Mürekkep bırakırım ✍️">
+    <!-- Kalem -->
+    <div class="fidget-pen" id="fidget-pen" title="Beni sürükle! ✍️" aria-hidden="true">
         <div class="pen-cap">
             <div class="pen-cap-band"></div>
             <div class="pen-clip"></div>
@@ -157,19 +143,19 @@
         </div>
     </div>
 
-    <!-- Sparkle Star (clickable) -->
-    <div class="sparkle-star" id="sparkle-star" title="Tıkla! ✨">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+    <!-- Yıldız -->
+    <div class="sparkle-star" id="sparkle-star" title="Tıkla! ✨" role="button" tabindex="0" aria-label="Işıltı efekti">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M12 2L13.5 9.5L21 8L14.5 12L18 19L12 14.5L6 19L9.5 12L3 8L10.5 9.5L12 2Z" 
                   fill="none" stroke="rgba(229,192,123,0.5)" stroke-width="1" stroke-linejoin="round"/>
         </svg>
     </div>
 
-    <!-- Fidget hint tooltip -->
-    <div class="fidget-hint" id="fidget-hint">
+    <div class="fidget-hint" id="fidget-hint" aria-hidden="true">
         <span>🖊️ Kalemi sürükle, mühürü çevir, yıldıza tıkla!</span>
     </div>
 
-    <script src="app.js"></script>
+    <!-- defer ile geciktir, DOM hazır olana kadar bekle -->
+    <script src="app.js" defer></script>
 </body>
 </html>
